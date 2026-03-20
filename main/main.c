@@ -15,11 +15,14 @@
 #include "xl9555.h"
 #include "button.h"
 #include "ft6336u_driver.h"
-#include "ap_wifi.h"
 #include "servo.h"   
 #include "as608.h"
 #include "finger_manager.h"
 #include "ble_unlock.h"
+#include "onenet_mqtt.h" 
+#include "onenet_dm.h"
+#include "wifi_ap.h"
+
 // #include "rc522.h"
 // static const uint8_t AUTHORIZED_UID[4] = {0x63, 0xD3, 0x2A, 0x07};
 
@@ -69,15 +72,6 @@ int get_button_level(int gpio)
     return (xl9555_io_level&gpio)?1:0;
 }
 
-// wifi状态回调函数
-void  wifi_state_callback(WIFI_STATE state)
-{
-    //网络连接成功
-    if(state == WIFI_STATE_CONNECTED)
-    {
-        ESP_LOGI(TAG, "WIFI_STATE_CONNECTED");
-    }
-}
 
 /**=================按键0长按回调函数=======================
  * @brief 按键长按回调函数,启动wifi配网
@@ -86,16 +80,10 @@ void  wifi_state_callback(WIFI_STATE state)
  *======================================================*/
 void long_press0(int gpio)
 {
-    static bool wifi_initialized = false;
-    
-    // 如果 WiFi 还未初始化，先初始化
-    if (!wifi_initialized) {
-        ap_wifi_init(wifi_state_callback);
-        wifi_initialized = true;
-    }
-    
+    ESP_LOGI(TAG, "进入配网模式...");
     // 启动配网模式
-    ap_wifi_apcfg(true);
+    My_WIFI_Init_AP();
+    start_http_server();
 }
 
 /**=================按键1长按回调函数=======================
@@ -117,6 +105,7 @@ void long_press2(int gpio)
 {
     finger_delete_last();
 }
+
 
 
 
@@ -360,8 +349,8 @@ void app_main(void)
     // 创建RC522任务（优先级1，栈大小4096）
     // xTaskCreate(rc522_task, "rc522_task", 4096, NULL, 1, NULL);
 
-    // 创建AS608任务（优先级1，栈大小4096）
-    xTaskCreate(as608_task, "as608_task", 4096, NULL, 1, NULL);
+    // 创建AS608任务（优先级1，栈大小）
+    xTaskCreate(as608_task, "as608_task", 3072, NULL, 1, NULL);
     
 
 

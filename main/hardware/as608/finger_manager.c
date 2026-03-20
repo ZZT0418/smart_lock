@@ -4,11 +4,13 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "onenet_dm.h"
 
 #define TAG "finger_manager"
 static uint16_t g_valid_finger_num = 0; // 全局有效指纹数量
 
-
+extern Unlockways_t Unlock_ways;
+extern LockAlarm_t Lock_alarm;
 
 /************************* 录入指纹 *************************/
 // 功能：实现指纹录入完整流程（采集2次图像→生成特征→比对→合并→存储）
@@ -202,15 +204,22 @@ void finger_verify(void)
         if (search_res.match_soc >= 100)
         {
             ESP_LOGI(TAG, "指纹验证成功！编号：%d，匹配分数：%d", search_res.page_id, search_res.match_soc);
+            Unlock_ways = UNLOCK_WAYS_FINGERPRINT;
             servo_unlock(); // 舵机开锁
         }
         else
         {
             ESP_LOGE(TAG, "指纹匹配分数过低：%d（阈值≥100）", search_res.match_soc);
+            Lock_alarm = LOCK_ALARM_ON;     // 报警
+            vTaskDelay(pdMS_TO_TICKS(500));
+            Lock_alarm = LOCK_ALARM_OFF;
         }
     }
     else
     {
         ESP_LOGE(TAG, "指纹验证失败：%s", as608_get_err_msg(ret));
+        Lock_alarm = LOCK_ALARM_ON;     // 报警
+        vTaskDelay(pdMS_TO_TICKS(500));
+        Lock_alarm = LOCK_ALARM_OFF;
     }
 }

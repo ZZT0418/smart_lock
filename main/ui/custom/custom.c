@@ -19,6 +19,7 @@
 #include "custom.h"
 #include "servo.h"
 #include "esp_log.h"
+#include "onenet_dm.h"
 
 /*********************
  *      DEFINES
@@ -47,6 +48,9 @@ static uint8_t password_index = 0;                                  //记录当�
 //保存按钮矩阵对象的指针，方便在其他函数中使用
 static lv_obj_t *btn = NULL;
 
+extern Unlockways_t Unlock_ways;
+extern LockAlarm_t Lock_alarm;
+
 
 /**
  * Create a demo application
@@ -70,6 +74,7 @@ void check_password(char *password)
     if(strcmp(password,USER_PASSWORD)==0)
     {
         ESP_LOGI(TAG,"密码正确，正在开锁");
+        Unlock_ways=UNLOCK_WAYS_PASSWORD;
         servo_unlock();
         //重置密码缓冲区，等待下次输入
         memset(password_buffer, 0, sizeof(password_buffer));
@@ -78,9 +83,12 @@ void check_password(char *password)
     else
     {
         ESP_LOGI(TAG,"密码错误，请重新输入");
+        Lock_alarm = LOCK_ALARM_ON;     // 报警
         //重置密码缓冲区，等待下次输入
         memset(password_buffer, 0, sizeof(password_buffer));
         password_index = 0;
+        vTaskDelay(pdMS_TO_TICKS(500));
+        Lock_alarm = LOCK_ALARM_OFF;
     }
 }
 

@@ -20,9 +20,12 @@
 #include "esp_gatts_api.h"               // 包含 ESP32 BLE GATT 服务器 API
 #include "esp_gatt_common_api.h"         // 包含 ESP32 BLE GATT 通用 API
 #include "servo.h"                       // 包含舵机控制模块头文件
+#include "onenet_dm.h"
 
 #define TAG             "ble_unlock"     // 定义日志标签，用于标识日志来源
 #define DEVICE_NAME     "smart_lock"     // 定义蓝牙设备名称，手机搜索时显示
+
+extern Unlockways_t Unlock_ways;
 
 // 定义自定义服务的 UUID (16 位)
 static const uint16_t GATTS_SERVICE_UUID_TEST = 0x1111;   // 自定义服务 UUID
@@ -330,6 +333,7 @@ static void unlock_task(void *pvParameters)
         // 参数：队列句柄、接收缓冲区、等待时间（portMAX_DELAY 表示无限等待）
         if (xQueueReceive(unlock_queue, &dummy, portMAX_DELAY) == pdTRUE) {
             // 收到开锁命令
+            Unlock_ways=UNLOCK_WAYS_BT;
             ESP_LOGI(TAG, "收到开锁命令，执行开锁");
             
             // 调用舵机开锁函数

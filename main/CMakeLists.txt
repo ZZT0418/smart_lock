@@ -1,4 +1,4 @@
-set(INCLUDES "." "./ble" "./onenet" "./ap_wifi" "./lvgl" "./bsp" "./hardware/rc522" "./hardware/as608" "./hardware/servo" 
+set(INCLUDES "." "./ble" "./onenet" "./wifi_ap" "./lvgl" "./bsp" "./hardware/rc522" "./hardware/as608" "./hardware/servo" 
             "./ui/generated" "./ui/custom" "./ui/generated/guider_customer_fonts")
 file(GLOB_RECURSE SOURCES ./*.c)
 

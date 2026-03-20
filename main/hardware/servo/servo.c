@@ -4,18 +4,31 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #define TAG "servo"
+
+int64_t Current_unlock_time = 0;
+
 /************************* 舵机控制接口 *************************/
-// 功能：验证成功后，舵机旋转开锁（示例：旋转90度，延时5秒复位）
+// 功能：验证成功后，舵机旋转开锁，并获取开锁时间戳
+// @return : 返回int64类型的UTC毫秒级时间戳
 void servo_unlock(void)
 {
     // ********** 此处添加舵机驱动代码 **********
     ESP_LOGI(TAG, "验证成功，门已开锁！");
     servo_set_angle(90); // 你的舵机旋转代码
+    Lock_state = LOCK_STATE_POEN;
+
+    // 获取当前时间戳
+    // esp_timer_get_time() 获取微秒级时间，除以1000转为毫秒级
+    // 强制转换为int64_t，确保数据类型与OneNet平台要求一致
+    Current_unlock_time = (int64_t)esp_timer_get_time() / 1000;
+
     vTaskDelay(pdMS_TO_TICKS(5000));
     servo_set_angle(0);  // 舵机复位
     ESP_LOGI(TAG, "门已上锁！");
+    Lock_state = LOCK_STATE_CLOSE;
 }
 
 void servo_init(void)
