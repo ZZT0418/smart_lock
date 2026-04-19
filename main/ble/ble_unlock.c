@@ -25,13 +25,20 @@
 #define TAG             "ble_unlock"     // 定义日志标签，用于标识日志来源
 #define DEVICE_NAME     "smart_lock"     // 定义蓝牙设备名称，手机搜索时显示
 
+// 【新增】定义蓝牙开锁认证令牌 (静态Token)
+// 建议：在实际项目中，这个值应该更复杂，或者由云端动态下发
+static const char *BLE_AUTH_TOKEN = "MySmartLock"; 
+static const uint8_t TOKEN_LEN = sizeof("MySmartLock") - 1;
+
 extern Unlockways_t Unlock_ways;
 
-// 定义自定义服务的 UUID (16 位)
-static const uint16_t GATTS_SERVICE_UUID_TEST = 0x1111;   // 自定义服务 UUID
+//使用标准 128-bit UUID
+// 定义自定义门锁服务的 UUID (16 位)
+static const uint8_t GATTS_SERVICE_UUID_TEST = 0x1111;           // 最后2字节是 0x1111（自定义）
 
-// 定义特征的 UUID (16 位)
-static const uint16_t GATTS_CHAR_UUID_CH1 = 0x2222;       // 特征值 UUID，用于手机读写数据
+
+// 定义开锁命令特征的 UUID (16 位)
+static const uint8_t GATTS_CHAR_UUID_CH1 = 0x2222;      // 特征值 UUID，用于手机读写数据
 
 // 定义特征权限（Permission）：可读可写
 #define GATTS_CHAR_PERM (ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE)  // 特征权限配置，允许读取和写入
@@ -229,17 +236,24 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
         // case 9: 特征写入事件（手机写入数据）
         case ESP_GATTS_WRITE_EVT:
             // 打印写入事件信息，包括数据长度
-            ESP_LOGI(TAG, "WRITE_EVT, len %d", param->write.len);
+            // ESP_LOGI(TAG, "WRITE_EVT, len %d", param->write.len);
             
-            // 检查写入的数据长度是否大于 0，且队列已创建
-            if (param->write.len > 0 && unlock_queue != NULL) {
-                int dummy = 1;  // 定义一个整数值作为开锁命令（实际应用中可以传递更复杂的数据）
-                
-                // 发送开锁命令到队列
-                if (xQueueSend(unlock_queue, &dummy, 0) == pdPASS) {
-                    ESP_LOGI(TAG, "开锁命令已发送到队列");  // 发送成功打印日志
+            if (param->write.len > 0) {
+                uint8_t *data = param->write.value;
+                // 【核心修改】进行 Token 校验
+                // 1. 检查长度是否匹配
+                // 2. 检查内容是否完全一致
+                if (param->write.len == TOKEN_LEN && memcmp(data, BLE_AUTH_TOKEN, TOKEN_LEN) == 0) {
+                    ESP_LOGI(TAG, ">>> 蓝牙认证成功，准备开锁");
+                    
+                    // 调用统一的锁管理器接口
+                    extern bool lock_manager_request_unlock(Unlockways_t way);
+                    lock_manager_request_unlock(UNLOCK_WAYS_BT);
+                    
                 } else {
-                    ESP_LOGE(TAG, "发送队列失败");  // 发送失败打印错误日志
+                    // 认证失败，记录日志但不执行开锁
+                    ESP_LOGW(TAG, ">>> 蓝牙认证失败！非法指令或错误密钥");
+                    // 可选：在这里可以增加“连续失败报警”逻辑
                 }
             }
             
