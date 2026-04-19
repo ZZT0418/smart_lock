@@ -205,7 +205,7 @@ void finger_verify(void)
         {
             ESP_LOGI(TAG, "指纹验证成功！编号：%d，匹配分数：%d", search_res.page_id, search_res.match_soc);
             Unlock_ways = UNLOCK_WAYS_FINGERPRINT;
-            servo_unlock(); // 舵机开锁
+            lock_manager_request_unlock(Unlock_ways); // 请求开锁
         }
         else
         {

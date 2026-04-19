@@ -321,12 +321,12 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_erase());
         nvs_ret = nvs_flash_init();
     }
-    //初始化舵机
-    servo_init();
-    //重置舵机角度
-    servo_set_angle(0);
+    //初始化舵机锁
+    servo_mutex_lock();             //初始化锁管理器，避免多开锁任务竞争导致锁状态混乱
+    servo_init();                   //初始化舵机驱动
+    servo_set_angle(0);             //初始重置舵机角度
 
-    //初始化lvgl
+    //初始化lvgl(密码开锁UI)
     my_lvgl_port_init();            //包括lcd相关显示硬件的初始化与lvgl的初始化
     lvgl_port_lock(0);
     setup_ui(&guider_ui);           //初始化ui界面
@@ -341,7 +341,7 @@ void app_main(void)
     }
 
 
-    //key初始化
+    //按键初始化
     button0_init();     //配网
     button1_init();     //添加指纹
     button2_init();     //删除指纹
@@ -352,10 +352,5 @@ void app_main(void)
     // 创建AS608任务（优先级1，栈大小）
     xTaskCreate(as608_task, "as608_task", 3072, NULL, 1, NULL);
     
-
-
-    
-
-
 
 }

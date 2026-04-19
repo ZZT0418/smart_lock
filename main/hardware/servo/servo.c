@@ -3,10 +3,15 @@
 #include "driver/ledc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 
 #define TAG "servo"
+static QueueHandle_t xUnlockQueue = NULL;
+static SemaphoreHandle_t xExecMutex = NULL;
+static LockControlState_t g_lock_state = LOCK_STATE_IDLE;       // 锁门状态初始为闲置
 
 int64_t Current_unlock_time = 0;
 
@@ -16,7 +21,6 @@ int64_t Current_unlock_time = 0;
 void servo_unlock(void)
 {
     // ********** 此处添加舵机驱动代码 **********
-    ESP_LOGI(TAG, "验证成功，门已开锁！");
     servo_set_angle(90); // 你的舵机旋转代码
     Lock_state = LOCK_STATE_POEN;
 
@@ -29,6 +33,93 @@ void servo_unlock(void)
     servo_set_angle(0);  // 舵机复位
     ESP_LOGI(TAG, "门已上锁！");
     Lock_state = LOCK_STATE_CLOSE;
+}
+/**
+ * @brief 内部开锁执行任务
+ * 该任务专门负责处理队列中的开锁请求，持有信号量并执行耗时动作
+ */
+static void unlock_executor_task(void *pvParameters) {
+    Unlockways_t way;
+    
+    while (1) {
+        // 阻塞等待队列中的开锁请求
+        if (xQueueReceive(xUnlockQueue, &way, portMAX_DELAY) == pdTRUE) { 
+            // 1. 获取执行权 (此时不在 UI 上下文，安全)
+            if (xSemaphoreTake(xExecMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                
+                // 2. 状态检查
+                if (g_lock_state == LOCK_STATE_BUSY) {
+                    ESP_LOGW(TAG, "丢弃重复请求: Way=%d", way);
+                    xSemaphoreGive(xExecMutex);
+                    continue;
+                }
+
+                g_lock_state = LOCK_STATE_BUSY;
+                ESP_LOGI(TAG, ">>> 开始执行开锁 (Way: %d)", way);
+                
+                // 3. 更新全局变量供日志使用
+                extern Unlockways_t Unlock_ways;
+                Unlock_ways = way;
+
+                // 4. 执行物理动作
+                servo_unlock(); 
+                
+                // 在执行完开锁后，检查队列里是否还有因为“排队”而积压的请求
+                // 如果有，全部清空，避免连续开锁
+                while (uxQueueMessagesWaiting(xUnlockQueue) > 0) {
+                    Unlockways_t discarded_way;
+                    xQueueReceive(xUnlockQueue, &discarded_way, 0);
+                    ESP_LOGW(TAG, "清除积压的开锁请求: Way=%d", discarded_way);
+                }
+
+                // 5. 恢复状态
+                g_lock_state = LOCK_STATE_IDLE;
+                ESP_LOGI(TAG, ">>> 开锁流程结束");
+                
+                xSemaphoreGive(xExecMutex);
+            }
+        }
+    }
+}
+
+// 互斥信号量与队列初始化,用于保护锁状态的访问，防止多线程竞争导致状态混乱
+void servo_mutex_lock(void)
+{
+    // 创建互斥量，保护执行过程
+    xExecMutex = xSemaphoreCreateMutex();
+    // 创建队列，深度为 5，存储开锁方式
+    xUnlockQueue = xQueueCreate(5, sizeof(Unlockways_t));
+    
+    if (xExecMutex && xUnlockQueue) {
+        // 创建执行任务，优先级设为 3 (中等优先级，低于 LVGL 但高于空闲任务)
+        xTaskCreate(unlock_executor_task, "unlock_exec", 4096, NULL, 3, NULL);
+        ESP_LOGI(TAG, "锁管理器初始化成功");
+    } else {
+        ESP_LOGE(TAG, "创建信号量或队列失败");
+    }
+}
+
+
+
+/************************* 统一开锁请求接口 *************************/
+/**
+ * @brief 统一开锁请求处理（异步非阻塞）
+ * @param way: 开锁方式 (指纹/蓝牙/密码等)
+ * @return: true 请求已入队, false 系统忙或队列满
+ * */
+bool lock_manager_request_unlock(Unlockways_t way)
+{
+    if (xUnlockQueue == NULL) return false;
+    
+    // 非阻塞发送：如果队列满了，说明系统太忙，直接拒绝
+    // 注意：这里不使用信号量，因为 xQueueSend 非常快且安全
+    if (xQueueSend(xUnlockQueue, &way, 0) == pdPASS) {
+        ESP_LOGI(TAG, "请求已入队: Way=%d", way);
+        return true;
+    } else {
+        ESP_LOGW(TAG, "请求被拒绝: 队列满或系统忙");
+        return false;
+    }
 }
 
 void servo_init(void)

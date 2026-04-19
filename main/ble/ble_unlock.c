@@ -333,12 +333,9 @@ static void unlock_task(void *pvParameters)
         // 参数：队列句柄、接收缓冲区、等待时间（portMAX_DELAY 表示无限等待）
         if (xQueueReceive(unlock_queue, &dummy, portMAX_DELAY) == pdTRUE) {
             // 收到开锁命令
+            ESP_LOGI(TAG, "收到蓝牙开锁命令，执行开锁");
             Unlock_ways=UNLOCK_WAYS_BT;
-            ESP_LOGI(TAG, "收到开锁命令，执行开锁");
-            
-            // 调用舵机开锁函数
-            // 注意：servo_unlock() 函数内部应该包含舵机转动和复位逻辑
-            servo_unlock();
+            lock_manager_request_unlock(UNLOCK_WAYS_BT);
         }
     }
 }

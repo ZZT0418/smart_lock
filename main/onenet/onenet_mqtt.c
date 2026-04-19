@@ -72,7 +72,6 @@ static void onenet_mqtt_event_handler(void* event_handler_arg,
                 cJSON_Delete(event_data);
             }
             
-            // 修复2：增大任务堆栈，调整优先级，增加更详细的错误日志
             // 使用静态方式创建数据上传任务，避免动态内存分配失败
             if (s_upload_task_handle == NULL) {
                 s_upload_task_handle = xTaskCreateStatic(
@@ -248,7 +247,7 @@ esp_err_t onenet_mqtt_start(void)
 }
 
 /*===========================数据上传任务=========================== 
-*功能：周期性向平台上报STM32串口发来的数据 
+*功能：周期性向平台上报数据或事件
 *参数：无 
 *返回值：无 
 ===================================================================*/

@@ -75,7 +75,7 @@ void check_password(char *password)
     {
         ESP_LOGI(TAG,"密码正确，正在开锁");
         Unlock_ways=UNLOCK_WAYS_PASSWORD;
-        servo_unlock();
+        lock_manager_request_unlock(UNLOCK_WAYS_PASSWORD);
         //重置密码缓冲区，等待下次输入
         memset(password_buffer, 0, sizeof(password_buffer));
         password_index = 0;

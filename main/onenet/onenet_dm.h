@@ -15,7 +15,7 @@ typedef enum
     UNLOCK_WAYS_PASSWORD = 0,           //密码方式
     UNLOCK_WAYS_FINGERPRINT = 1,        //指纹方式
     UNLOCK_WAYS_CARD = 2,               //卡片方式
-    UNLOCK_WAYS_BT = 3,                 //远程方式
+    UNLOCK_WAYS_BT = 3,                 //蓝牙远程方式
     UNLOCK_WAYS_WAITING = 4             //开锁方式验证中
 } Unlockways_t;
 //门锁报警属性枚举
